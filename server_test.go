@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func TestNewGRPCServer(t *testing.T) {
@@ -37,6 +38,9 @@ func TestGRPCServer_Listen(t *testing.T) {
 
 		require.NotNil(t, srv)
 
+		err := srv.IsReady(ctx)
+		assert.ErrorIs(t, err, ErrNotReady)
+
 		var wg sync.WaitGroup
 		wg.Add(1)
 
@@ -48,7 +52,7 @@ func TestGRPCServer_Listen(t *testing.T) {
 				ctx, cancelFunc := context.WithTimeout(ctx, time.Second)
 				defer cancelFunc()
 
-				conn, err := grpc.DialContext(ctx, "localhost:9091", grpc.WithInsecure(), grpc.WithReturnConnectionError())
+				conn, err := grpc.DialContext(ctx, "localhost:9091", grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithReturnConnectionError())
 				if err != nil {
 					return false
 				}
@@ -61,8 +65,11 @@ func TestGRPCServer_Listen(t *testing.T) {
 
 		}()
 
-		err := srv.Listen(ctx)
+		err = srv.Listen(ctx)
 		require.NoError(t, err)
+
+		err = srv.IsReady(ctx)
+		assert.NoError(t, err)
 
 		wg.Wait()
 	})
