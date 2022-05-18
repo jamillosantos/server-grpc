@@ -2,13 +2,17 @@ package srvgrpc
 
 import (
 	"context"
+	"errors"
 	"net"
+	"sync/atomic"
 	"time"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
+
+var ErrNotReady = errors.New("service is not ready")
 
 type grpcOpts struct {
 	bindAddress        string
@@ -33,6 +37,7 @@ type GRPCServer struct {
 	server     *grpc.Server
 	registerer Registerer
 	opts       []Option
+	ready      atomic.Value
 }
 
 func NewGRPCServer(name string, registerer Registerer, opts ...Option) *GRPCServer {
@@ -87,7 +92,15 @@ func (g *GRPCServer) Listen(_ context.Context) error {
 		return err
 	}
 
-	return g.server.Serve(lis)
+	err = g.server.Serve(lis)
+	if err != nil {
+		return err
+	}
+
+	// Mark the service as ready.
+	g.ready.Store(true)
+
+	return nil
 }
 
 // Close will stop this server.
@@ -96,6 +109,13 @@ func (g *GRPCServer) Listen(_ context.Context) error {
 func (g *GRPCServer) Close(_ context.Context) error {
 	if g.server != nil {
 		g.server.GracefulStop()
+	}
+	return nil
+}
+
+func (g *GRPCServer) IsReady(_ context.Context) error {
+	if v := g.ready.Load(); v == nil || v == false {
+		return ErrNotReady
 	}
 	return nil
 }
