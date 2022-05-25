@@ -92,13 +92,19 @@ func (g *GRPCServer) Listen(_ context.Context) error {
 		return err
 	}
 
+	// Mark the service as ready.
+	go func() {
+		// Give some time to mark it as ready.
+		time.Sleep(time.Millisecond * 100)
+		g.ready.Store(true)
+	}()
+
 	err = g.server.Serve(lis)
 	if err != nil {
 		return err
 	}
 
-	// Mark the service as ready.
-	g.ready.Store(true)
+	g.ready.Store(false)
 
 	return nil
 }

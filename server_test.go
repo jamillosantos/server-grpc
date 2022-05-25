@@ -60,6 +60,9 @@ func TestGRPCServer_Listen(t *testing.T) {
 					_ = conn.Close()
 				}()
 
+				err = srv.IsReady(ctx)
+				assert.NoError(t, err)
+
 				return true
 			}, time.Second, time.Millisecond*100, "server was could not be connected")
 
@@ -67,9 +70,6 @@ func TestGRPCServer_Listen(t *testing.T) {
 
 		err = srv.Listen(ctx)
 		require.NoError(t, err)
-
-		err = srv.IsReady(ctx)
-		assert.NoError(t, err)
 
 		wg.Wait()
 	})
