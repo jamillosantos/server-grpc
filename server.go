@@ -23,7 +23,7 @@ type grpcOpts struct {
 
 func defaultOpts() grpcOpts {
 	return grpcOpts{
-		bindAddress:        ":9090",
+		bindAddress:        ":50051",
 		unaryInterceptors:  make([]grpc.UnaryServerInterceptor, 0),
 		streamInterceptors: make([]grpc.StreamServerInterceptor, 0),
 		connectionTimeout:  time.Second * 15,
