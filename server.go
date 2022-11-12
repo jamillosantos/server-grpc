@@ -8,6 +8,7 @@ import (
 	"time"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
@@ -69,11 +70,13 @@ func (g *GRPCServer) Listen(_ context.Context) error {
 	}
 
 	unaryInterceptors := []grpc.UnaryServerInterceptor{
+		grpc_prometheus.UnaryServerInterceptor,
 		otelgrpc.UnaryServerInterceptor(),
 	}
 	unaryInterceptors = append(unaryInterceptors, o.unaryInterceptors...)
 
 	streamInterceptors := []grpc.StreamServerInterceptor{
+		grpc_prometheus.StreamServerInterceptor,
 		otelgrpc.StreamServerInterceptor(),
 	}
 	streamInterceptors = append(streamInterceptors, o.streamInterceptors...)
@@ -92,19 +95,13 @@ func (g *GRPCServer) Listen(_ context.Context) error {
 		return err
 	}
 
-	// Mark the service as ready.
-	go func() {
-		// Give some time to mark it as ready.
-		time.Sleep(time.Millisecond * 100)
-		g.ready.Store(true)
-	}()
+	g.ready.Store(true)
+	defer g.ready.Store(false)
 
 	err = g.server.Serve(lis)
 	if err != nil {
 		return err
 	}
-
-	g.ready.Store(false)
 
 	return nil
 }
@@ -119,6 +116,8 @@ func (g *GRPCServer) Close(_ context.Context) error {
 	return nil
 }
 
+// IsReady will return true if the service is ready to accept requests. This is compliant with the
+// github.com/jamillosantos/application library.
 func (g *GRPCServer) IsReady(_ context.Context) error {
 	if v := g.ready.Load(); v == nil || v == false {
 		return ErrNotReady
