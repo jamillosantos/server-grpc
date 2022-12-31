@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -39,6 +40,7 @@ type GRPCServer struct {
 	registerer Registerer
 	opts       []Option
 	ready      atomic.Value
+	serverWg   sync.WaitGroup
 }
 
 func NewGRPCServer(name string, registerer Registerer, opts ...Option) *GRPCServer {
@@ -96,12 +98,19 @@ func (g *GRPCServer) Listen(_ context.Context) error {
 	}
 
 	g.ready.Store(true)
-	defer g.ready.Store(false)
 
-	err = g.server.Serve(lis)
-	if err != nil {
-		return err
-	}
+	g.serverWg.Add(1)
+	go func() {
+		defer func() {
+			g.serverWg.Done()
+			g.ready.Store(false)
+		}()
+
+		err = g.server.Serve(lis)
+		if err != nil {
+			return
+		}
+	}()
 
 	return nil
 }
@@ -113,6 +122,7 @@ func (g *GRPCServer) Close(_ context.Context) error {
 	if g.server != nil {
 		g.server.GracefulStop()
 	}
+	g.serverWg.Wait()
 	return nil
 }
 
