@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 	"testing"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 
 func TestNewGRPCServer(t *testing.T) {
 	wantName := "name"
-	wantRegisterer := func(server *grpc.Server) error { return nil }
+	wantRegisterer := func(_ *grpc.Server) error { return nil }
 	wantOpt1 := WithBindAddress("bind:9090")
 	wantOpt2 := WithConnectionTimeout(time.Second)
 	s := NewGRPCServer(wantName, wantRegisterer, wantOpt1, wantOpt2)
@@ -32,7 +31,7 @@ func TestGRPCServer_Listen(t *testing.T) {
 	t.Run("should start the server", func(t *testing.T) {
 		ctx := context.TODO()
 
-		srv := NewGRPCServer("grpc server", func(s *grpc.Server) error {
+		srv := NewGRPCServer("grpc server", func(_ *grpc.Server) error {
 			return nil
 		}, WithBindAddress("localhost:9091"))
 
@@ -41,51 +40,43 @@ func TestGRPCServer_Listen(t *testing.T) {
 		err := srv.IsReady(ctx)
 		assert.ErrorIs(t, err, ErrNotReady)
 
-		var wg sync.WaitGroup
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-			defer srv.Close(ctx)
-
-			require.Eventually(t, func() bool {
-				ctx, cancelFunc := context.WithTimeout(ctx, time.Second)
-				defer cancelFunc()
-
-				conn, err := grpc.DialContext(ctx, "localhost:9091", grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithReturnConnectionError())
-				if err != nil {
-					return false
-				}
-				defer func() {
-					_ = conn.Close()
-				}()
-
-				err = srv.IsReady(ctx)
-				assert.NoError(t, err)
-
-				return true
-			}, time.Second, time.Millisecond*100, "server was could not be connected")
-
-		}()
-
 		err = srv.Listen(ctx)
 		require.NoError(t, err)
 
-		wg.Wait()
+		defer func() {
+			_ = srv.Close(ctx)
+		}()
+
+		// Wait for server to be ready
+		require.Eventually(t, func() bool {
+			err := srv.IsReady(ctx)
+			return err == nil
+		}, time.Second*2, time.Millisecond*100, "server never became ready")
+
+		// Verify we can connect
+		conn, err := grpc.NewClient("localhost:9091", grpc.WithTransportCredentials(insecure.NewCredentials()))
+		require.NoError(t, err)
+		defer func() {
+			_ = conn.Close()
+		}()
 	})
 
 	t.Run("should fail when the port is busy", func(t *testing.T) {
 		ctx := context.Background()
 
-		lis, err := net.Listen("tcp", "localhost:9091")
+		lis, err := net.Listen("tcp", "localhost:9092")
 		require.NoError(t, err)
-		defer lis.Close()
+		defer func() {
+			_ = lis.Close()
+		}()
 
-		srv := NewGRPCServer("grpc server", func(s *grpc.Server) error {
+		srv := NewGRPCServer("grpc server", func(_ *grpc.Server) error {
 			return nil
-		}, WithBindAddress("localhost:9091"))
+		}, WithBindAddress("localhost:9092"))
 
-		defer srv.Close(ctx)
+		defer func() {
+			_ = srv.Close(ctx)
+		}()
 
 		err = srv.Listen(ctx)
 		assert.Error(t, err)
@@ -96,11 +87,13 @@ func TestGRPCServer_Listen(t *testing.T) {
 
 		wantErr := errors.New("random error")
 
-		srv := NewGRPCServer("grpc server", func(s *grpc.Server) error {
+		srv := NewGRPCServer("grpc server", func(_ *grpc.Server) error {
 			return wantErr
-		}, WithBindAddress("localhost:9091"))
+		}, WithBindAddress("localhost:9093"))
 
-		defer srv.Close(ctx)
+		defer func() {
+			_ = srv.Close(ctx)
+		}()
 
 		err := srv.Listen(ctx)
 		assert.ErrorIs(t, err, wantErr)

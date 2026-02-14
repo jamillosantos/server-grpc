@@ -1,3 +1,4 @@
+// Package srvgrpc provides a gRPC server wrapper with support for interceptors, metrics, and tracing.
 package srvgrpc
 
 import (
@@ -9,11 +10,12 @@ import (
 	"time"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
+// ErrNotReady is returned when the server is not ready to accept requests.
 var ErrNotReady = errors.New("service is not ready")
 
 type grpcOpts struct {
@@ -32,8 +34,10 @@ func defaultOpts() grpcOpts {
 	}
 }
 
+// Registerer is a function that registers gRPC services with the server.
 type Registerer func(*grpc.Server) error
 
+// GRPCServer is a wrapper around a gRPC server that implements the application.Service interface.
 type GRPCServer struct {
 	name       string
 	server     *grpc.Server
@@ -43,6 +47,7 @@ type GRPCServer struct {
 	serverWg   sync.WaitGroup
 }
 
+// NewGRPCServer creates a new gRPC server with the given name, service registerer, and options.
 func NewGRPCServer(name string, registerer Registerer, opts ...Option) *GRPCServer {
 	return &GRPCServer{
 		name:       name,
@@ -71,19 +76,20 @@ func (g *GRPCServer) Listen(_ context.Context) error {
 		return err
 	}
 
+	srvMetrics := prometheus.NewServerMetrics()
+
 	unaryInterceptors := []grpc.UnaryServerInterceptor{
-		grpc_prometheus.UnaryServerInterceptor,
-		otelgrpc.UnaryServerInterceptor(),
+		srvMetrics.UnaryServerInterceptor(),
 	}
 	unaryInterceptors = append(unaryInterceptors, o.unaryInterceptors...)
 
 	streamInterceptors := []grpc.StreamServerInterceptor{
-		grpc_prometheus.StreamServerInterceptor,
-		otelgrpc.StreamServerInterceptor(),
+		srvMetrics.StreamServerInterceptor(),
 	}
 	streamInterceptors = append(streamInterceptors, o.streamInterceptors...)
 
 	g.server = grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.UnaryInterceptor(
 			grpc_middleware.ChainUnaryServer(unaryInterceptors...),
 		),

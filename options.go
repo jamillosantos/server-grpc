@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Option is a function that configures gRPC server options.
 type Option func(o *grpcOpts)
 
 // WithBindAddress sets the bind address used to open the GRPC server.
