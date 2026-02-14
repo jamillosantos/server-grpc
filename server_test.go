@@ -46,7 +46,9 @@ func TestGRPCServer_Listen(t *testing.T) {
 
 		go func() {
 			defer wg.Done()
-			defer srv.Close(ctx)
+			defer func() {
+				_ = srv.Close(ctx)
+			}()
 
 			require.Eventually(t, func() bool {
 				ctx, cancelFunc := context.WithTimeout(ctx, time.Second)
@@ -79,13 +81,17 @@ func TestGRPCServer_Listen(t *testing.T) {
 
 		lis, err := net.Listen("tcp", "localhost:9091")
 		require.NoError(t, err)
-		defer lis.Close()
+		defer func() {
+			_ = lis.Close()
+		}()
 
 		srv := NewGRPCServer("grpc server", func(s *grpc.Server) error {
 			return nil
 		}, WithBindAddress("localhost:9091"))
 
-		defer srv.Close(ctx)
+		defer func() {
+			_ = srv.Close(ctx)
+		}()
 
 		err = srv.Listen(ctx)
 		assert.Error(t, err)
@@ -100,7 +106,9 @@ func TestGRPCServer_Listen(t *testing.T) {
 			return wantErr
 		}, WithBindAddress("localhost:9091"))
 
-		defer srv.Close(ctx)
+		defer func() {
+			_ = srv.Close(ctx)
+		}()
 
 		err := srv.Listen(ctx)
 		assert.ErrorIs(t, err, wantErr)

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
@@ -34,6 +34,7 @@ func defaultOpts() grpcOpts {
 
 type Registerer func(*grpc.Server) error
 
+// GRPCServer is a wrapper around a gRPC server that implements the application.Service interface.
 type GRPCServer struct {
 	name       string
 	server     *grpc.Server
@@ -71,19 +72,20 @@ func (g *GRPCServer) Listen(_ context.Context) error {
 		return err
 	}
 
+	srvMetrics := prometheus.NewServerMetrics()
+
 	unaryInterceptors := []grpc.UnaryServerInterceptor{
-		grpc_prometheus.UnaryServerInterceptor,
-		otelgrpc.UnaryServerInterceptor(),
+		srvMetrics.UnaryServerInterceptor(),
 	}
 	unaryInterceptors = append(unaryInterceptors, o.unaryInterceptors...)
 
 	streamInterceptors := []grpc.StreamServerInterceptor{
-		grpc_prometheus.StreamServerInterceptor,
-		otelgrpc.StreamServerInterceptor(),
+		srvMetrics.StreamServerInterceptor(),
 	}
 	streamInterceptors = append(streamInterceptors, o.streamInterceptors...)
 
 	g.server = grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.UnaryInterceptor(
 			grpc_middleware.ChainUnaryServer(unaryInterceptors...),
 		),
