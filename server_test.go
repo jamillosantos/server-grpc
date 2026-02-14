@@ -17,7 +17,7 @@ import (
 
 func TestNewGRPCServer(t *testing.T) {
 	wantName := "name"
-	wantRegisterer := func(server *grpc.Server) error { return nil }
+	wantRegisterer := func(_ *grpc.Server) error { return nil }
 	wantOpt1 := WithBindAddress("bind:9090")
 	wantOpt2 := WithConnectionTimeout(time.Second)
 	s := NewGRPCServer(wantName, wantRegisterer, wantOpt1, wantOpt2)
@@ -32,7 +32,7 @@ func TestGRPCServer_Listen(t *testing.T) {
 	t.Run("should start the server", func(t *testing.T) {
 		ctx := context.TODO()
 
-		srv := NewGRPCServer("grpc server", func(s *grpc.Server) error {
+		srv := NewGRPCServer("grpc server", func(_ *grpc.Server) error {
 			return nil
 		}, WithBindAddress("localhost:9091"))
 
@@ -54,7 +54,7 @@ func TestGRPCServer_Listen(t *testing.T) {
 				ctx, cancelFunc := context.WithTimeout(ctx, time.Second)
 				defer cancelFunc()
 
-				conn, err := grpc.DialContext(ctx, "localhost:9091", grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithReturnConnectionError())
+				conn, err := grpc.NewClient("localhost:9091", grpc.WithTransportCredentials(insecure.NewCredentials()))
 				if err != nil {
 					return false
 				}
@@ -85,7 +85,7 @@ func TestGRPCServer_Listen(t *testing.T) {
 			_ = lis.Close()
 		}()
 
-		srv := NewGRPCServer("grpc server", func(s *grpc.Server) error {
+		srv := NewGRPCServer("grpc server", func(_ *grpc.Server) error {
 			return nil
 		}, WithBindAddress("localhost:9091"))
 
@@ -102,7 +102,7 @@ func TestGRPCServer_Listen(t *testing.T) {
 
 		wantErr := errors.New("random error")
 
-		srv := NewGRPCServer("grpc server", func(s *grpc.Server) error {
+		srv := NewGRPCServer("grpc server", func(_ *grpc.Server) error {
 			return wantErr
 		}, WithBindAddress("localhost:9091"))
 

@@ -1,3 +1,4 @@
+// Package srvgrpc provides a gRPC server wrapper with support for interceptors, metrics, and tracing.
 package srvgrpc
 
 import (

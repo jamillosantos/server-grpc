@@ -12,7 +12,7 @@ import (
 )
 
 func TestWithUnaryInterceptor(t *testing.T) {
-	wantInterceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	wantInterceptor := func(_ context.Context, _ interface{}, _ *grpc.UnaryServerInfo, _ grpc.UnaryHandler) (resp interface{}, err error) {
 		return nil, nil
 	}
 	o := grpcOpts{}
@@ -22,7 +22,7 @@ func TestWithUnaryInterceptor(t *testing.T) {
 }
 
 func TestWithStreamInterceptor(t *testing.T) {
-	wantInterceptor := func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	wantInterceptor := func(_ interface{}, _ grpc.ServerStream, _ *grpc.StreamServerInfo, _ grpc.StreamHandler) error {
 		return nil
 	}
 	o := grpcOpts{}
