@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 	"testing"
 	"time"
 
@@ -41,45 +40,31 @@ func TestGRPCServer_Listen(t *testing.T) {
 		err := srv.IsReady(ctx)
 		assert.ErrorIs(t, err, ErrNotReady)
 
-		var wg sync.WaitGroup
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-			defer func() {
-				_ = srv.Close(ctx)
-			}()
-
-			require.Eventually(t, func() bool {
-				ctx, cancelFunc := context.WithTimeout(ctx, time.Second)
-				defer cancelFunc()
-
-				conn, err := grpc.NewClient("localhost:9091", grpc.WithTransportCredentials(insecure.NewCredentials()))
-				if err != nil {
-					return false
-				}
-				defer func() {
-					_ = conn.Close()
-				}()
-
-				err = srv.IsReady(ctx)
-				assert.NoError(t, err)
-
-				return true
-			}, time.Second, time.Millisecond*100, "server was could not be connected")
-
-		}()
-
 		err = srv.Listen(ctx)
 		require.NoError(t, err)
 
-		wg.Wait()
+		defer func() {
+			_ = srv.Close(ctx)
+		}()
+
+		// Wait for server to be ready
+		require.Eventually(t, func() bool {
+			err := srv.IsReady(ctx)
+			return err == nil
+		}, time.Second*2, time.Millisecond*100, "server never became ready")
+
+		// Verify we can connect
+		conn, err := grpc.NewClient("localhost:9091", grpc.WithTransportCredentials(insecure.NewCredentials()))
+		require.NoError(t, err)
+		defer func() {
+			_ = conn.Close()
+		}()
 	})
 
 	t.Run("should fail when the port is busy", func(t *testing.T) {
 		ctx := context.Background()
 
-		lis, err := net.Listen("tcp", "localhost:9091")
+		lis, err := net.Listen("tcp", "localhost:9092")
 		require.NoError(t, err)
 		defer func() {
 			_ = lis.Close()
@@ -87,7 +72,7 @@ func TestGRPCServer_Listen(t *testing.T) {
 
 		srv := NewGRPCServer("grpc server", func(_ *grpc.Server) error {
 			return nil
-		}, WithBindAddress("localhost:9091"))
+		}, WithBindAddress("localhost:9092"))
 
 		defer func() {
 			_ = srv.Close(ctx)
@@ -104,7 +89,7 @@ func TestGRPCServer_Listen(t *testing.T) {
 
 		srv := NewGRPCServer("grpc server", func(_ *grpc.Server) error {
 			return wantErr
-		}, WithBindAddress("localhost:9091"))
+		}, WithBindAddress("localhost:9093"))
 
 		defer func() {
 			_ = srv.Close(ctx)
