@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// ErrNotReady is returned when the server is not ready to accept requests.
 var ErrNotReady = errors.New("service is not ready")
 
 type grpcOpts struct {
@@ -32,6 +33,7 @@ func defaultOpts() grpcOpts {
 	}
 }
 
+// Registerer is a function that registers gRPC services with the server.
 type Registerer func(*grpc.Server) error
 
 // GRPCServer is a wrapper around a gRPC server that implements the application.Service interface.
@@ -44,6 +46,7 @@ type GRPCServer struct {
 	serverWg   sync.WaitGroup
 }
 
+// NewGRPCServer creates a new gRPC server with the given name, service registerer, and options.
 func NewGRPCServer(name string, registerer Registerer, opts ...Option) *GRPCServer {
 	return &GRPCServer{
 		name:       name,
