@@ -39,12 +39,13 @@ type Registerer func(*grpc.Server) error
 
 // GRPCServer is a wrapper around a gRPC server that implements the application.Service interface.
 type GRPCServer struct {
-	name       string
-	server     *grpc.Server
-	registerer Registerer
-	opts       []Option
-	ready      atomic.Value
-	serverWg   sync.WaitGroup
+	name        string
+	server      *grpc.Server
+	registerer  Registerer
+	opts        []Option
+	bindAddress string
+	ready       atomic.Value
+	serverWg    sync.WaitGroup
 }
 
 // NewGRPCServer creates a new gRPC server with the given name, service registerer, and options.
@@ -64,7 +65,7 @@ func (g *GRPCServer) Name() string {
 // Listen will start the server and will block until the service is closed.
 //
 // If the services is already listining, this should return an error ErrAlreadyListening.
-func (g *GRPCServer) Listen(_ context.Context) error {
+func (g *GRPCServer) Listen(ctx context.Context) error {
 	o := defaultOpts()
 
 	for _, option := range g.opts {
@@ -75,6 +76,7 @@ func (g *GRPCServer) Listen(_ context.Context) error {
 	if err != nil {
 		return err
 	}
+	g.bindAddress = lis.Addr().String()
 
 	srvMetrics := prometheus.NewServerMetrics()
 
@@ -103,18 +105,29 @@ func (g *GRPCServer) Listen(_ context.Context) error {
 		return err
 	}
 
-	g.ready.Store(true)
-
 	g.serverWg.Add(1)
 	go func() {
 		defer func() {
 			g.serverWg.Done()
 			g.ready.Store(false)
 		}()
+		_ = g.server.Serve(lis)
+	}()
 
-		err = g.server.Serve(lis)
-		if err != nil {
-			return
+	go func() {
+		dialer := &net.Dialer{}
+		for {
+			conn, err := dialer.DialContext(ctx, "tcp", g.bindAddress)
+			if err == nil {
+				_ = conn.Close()
+				g.ready.Store(true)
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 		}
 	}()
 
