@@ -3,37 +3,44 @@ package srvgrpc
 import (
 	"context"
 	"fmt"
-	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"google.golang.org/grpc"
 )
 
-func TestWithUnaryInterceptor(t *testing.T) {
-	wantInterceptor := func(_ context.Context, _ interface{}, _ *grpc.UnaryServerInfo, _ grpc.UnaryHandler) (resp interface{}, err error) {
-		return nil, nil
-	}
-	o := grpcOpts{}
-	WithUnaryInterceptor(wantInterceptor)(&o)
-	require.Len(t, o.unaryInterceptors, 1)
-	assert.Equal(t, fmt.Sprintf("%p", wantInterceptor), fmt.Sprintf("%p", o.unaryInterceptors[0]))
-}
+var _ = Describe("Options", func() {
+	Describe("WithUnaryInterceptor", func() {
+		It("should append the interceptor", func() {
+			wantInterceptor := func(_ context.Context, _ interface{}, _ *grpc.UnaryServerInfo, _ grpc.UnaryHandler) (resp interface{}, err error) {
+				return nil, nil
+			}
+			o := grpcOpts{}
+			WithUnaryInterceptor(wantInterceptor)(&o)
+			Expect(o.unaryInterceptors).To(HaveLen(1))
+			Expect(fmt.Sprintf("%p", o.unaryInterceptors[0])).To(Equal(fmt.Sprintf("%p", wantInterceptor)))
+		})
+	})
 
-func TestWithStreamInterceptor(t *testing.T) {
-	wantInterceptor := func(_ interface{}, _ grpc.ServerStream, _ *grpc.StreamServerInfo, _ grpc.StreamHandler) error {
-		return nil
-	}
-	o := grpcOpts{}
-	WithStreamInterceptor(wantInterceptor)(&o)
-	require.Len(t, o.streamInterceptors, 1)
-	assert.Equal(t, fmt.Sprintf("%p", wantInterceptor), fmt.Sprintf("%p", o.streamInterceptors[0]))
-}
+	Describe("WithStreamInterceptor", func() {
+		It("should append the interceptor", func() {
+			wantInterceptor := func(_ interface{}, _ grpc.ServerStream, _ *grpc.StreamServerInfo, _ grpc.StreamHandler) error {
+				return nil
+			}
+			o := grpcOpts{}
+			WithStreamInterceptor(wantInterceptor)(&o)
+			Expect(o.streamInterceptors).To(HaveLen(1))
+			Expect(fmt.Sprintf("%p", o.streamInterceptors[0])).To(Equal(fmt.Sprintf("%p", wantInterceptor)))
+		})
+	})
 
-func TestWithConnectionTimeout(t *testing.T) {
-	wantConnectionTimeout := time.Second * 123
-	o := grpcOpts{}
-	WithConnectionTimeout(wantConnectionTimeout)(&o)
-	assert.Equal(t, wantConnectionTimeout, o.connectionTimeout)
-}
+	Describe("WithConnectionTimeout", func() {
+		It("should set the connection timeout", func() {
+			wantConnectionTimeout := time.Second * 123
+			o := grpcOpts{}
+			WithConnectionTimeout(wantConnectionTimeout)(&o)
+			Expect(o.connectionTimeout).To(Equal(wantConnectionTimeout))
+		})
+	})
+})
